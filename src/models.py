@@ -26,7 +26,7 @@ class CancerPredictor(pl.LightningModule):
             nn.Linear(in_features=19, out_features=32),
             nn.ReLU(),
             nn.Dropout(p=self.hparams.dropout_prob),
-            nn.Linear(in_features=32, out_features=8),
+            nn.Linear(in_features=16, out_features=8),
             nn.ReLU(),
         )
         self.output_layer = nn.Linear(
@@ -39,9 +39,29 @@ class CancerPredictor(pl.LightningModule):
         x = t.cat((x_numerical, x_mutation), dim=1)
         return self.output_layer(x)
 
+    def predict_step(self, batch, batch_idx):
+        x_numerical, x_mutation, y = batch
+        logits = self.forward(x_numerical, x_mutation)
+        return t.softmax(logits, dim=1)
+
     def configure_optimizers(self):
-        optimizer = t.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
-        return optimizer
+        optimizer = tuple.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        scheduler = t.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",  # We want to minimize the validation loss
+            factor=0.1,  # Reduce LR by a factor of 10
+            patience=10,  # Epochs with no improvement before reducing LR
+            verbose=True,
+        )
+
+        # Return both in the required dictionary format
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "monitor": "val_loss",  # The metric to monitor
+            },
+        }
 
     def _calculate_loss(self, batch, mode="train"):
         """

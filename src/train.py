@@ -1,11 +1,13 @@
 import optuna
+import pandas as pd
 import pytorch_lightning as pl
 import torch as t
+import torch.nn.functional as F
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset
 
-from config import DEVICE, MUTATION_COL, NUMERICAL_COLS, PROTEIN_SELECTED
+from config import BEST_PARAMS, DEVICE, MUTATION_COL, NUMERICAL_COLS
 from src.etl import get_train_test_data, preprocess_fold
 
 from .models import CancerPredictor
@@ -39,7 +41,9 @@ class CancerDataset(Dataset):
         label = self.df.loc[sample_id]["tumor_type"]
         label = self.label_encoder.transform([label])[0]
 
-        numerical_features = t.tensor(numerical_features.astype(float).values, dtype=t.float32)
+        numerical_features = t.tensor(
+            numerical_features.astype(float).values, dtype=t.float32
+        )
         mutation_id = t.tensor(mutation_id, dtype=t.long)
         label = t.tensor(label, dtype=t.long)
 
@@ -59,21 +63,33 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
     )
     learning_rate_callback = pl.callbacks.LearningRateMonitor(logging_interval="epoch")
 
+    early_stop_callback = pl.callbacks.EarlyStopping(
+        monitor="val_loss",
+        patience=15,  # Number of epochs with no improvement before stopping
+        verbose=True,
+        mode="min",
+    )
+
     trainer = pl.Trainer(
         accelerator="gpu" if str(DEVICE).startswith("cuda") else "cpu",
         devices=1,
-        max_epochs=10,
+        max_epochs=100,
+        log_every_n_steps=4,
         gradient_clip_val=5,
-        callbacks=[checkpoint_callback, learning_rate_callback],
+        callbacks=[checkpoint_callback, learning_rate_callback, early_stop_callback],
         enable_progress_bar=True,
     )
 
     model = CancerPredictor(**kwargs)
     trainer.fit(model, train_loader, val_loader)
 
-    val_result = trainer.validate(val_loader, ckpt_path="best", verbose=False)
+    val_result = trainer.validate(
+        dataloaders=val_loader, ckpt_path="best", verbose=False
+    )
     if test_loader:
-        test_results = trainer.test(test_loader, ckpt_path="best", verbose=False)
+        test_results = trainer.test(
+            dataloaders=test_loader, ckpt_path="best", verbose=False
+        )
         output_test_result = test_results[0]["test_acc"]
     else:
         output_test_result = None
@@ -84,10 +100,12 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
         "test_acc": output_test_result,
     }
 
-    return checkpoint_callback.best_model_path, results
+    return trainer, results
 
 
 def tune_hyperparameters():
+    """perform hyperparameter tuning."""
+
     raw_train_val_df, raw_test_df = get_train_test_data()
     train_df, val_df, trainsforms = preprocess_fold(raw_train_val_df, raw_test_df)
     mutation_to_idx = trainsforms["mutation_to_idx"]
@@ -99,14 +117,14 @@ def tune_hyperparameters():
             train_df, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
         ),
         batch_size=32,
-        num_workers = 3,
+        num_workers=3,
     )
     val_loader = t.utils.data.DataLoader(
         CancerDataset(
             val_df, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
         ),
         batch_size=32,
-        num_workers = 3,
+        num_workers=3,
     )
 
     def objective(trial):
@@ -127,4 +145,71 @@ def tune_hyperparameters():
 
 
 def run_cross_validation():
-    pass
+    """run 10 fold cross validation."""
+
+    train_df = get_train_test_data(train_only=True)
+    label_encoder = LabelEncoder()
+    train_df["tumor_type_encoded"] = label_encoder.fit_transform(train_df["tumor_type"])
+
+    fold_scores = []
+    all_oof_results = []
+
+    for idx, (train_idx, val_idx) in enumerate(
+        StratifiedKFold(n_splits=10, shuffle=True, random_state=42).split(
+            train_df["sample_id"], train_df["tumor_type"]
+        )
+    ):
+        train_fold = train_df.iloc[train_idx].copy()
+        val_fold = train_df.iloc[val_idx].copy()
+
+        train_fold, val_fold, transforms = preprocess_fold(train_fold, val_fold)
+        mutation_to_idx = transforms["mutation_to_idx"]
+
+        train_loader = t.utils.data.DataLoader(
+            CancerDataset(
+                train_fold, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
+            ),
+            batch_size=32,
+            num_workers=3,
+        )
+
+        val_loader = t.utils.data.DataLoader(
+            CancerDataset(
+                val_fold, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
+            ),
+            batch_size=32,
+            num_workers=3,
+        )
+
+        trainer, results = train_model(train_loader, val_loader, **BEST_PARAMS)
+        fold_scores.append(results["best_val_loss"])
+
+        model = CancerPredictor.load_from_checkpoint(
+            trainer.checkpoint_callback.best_model_path
+        )
+        predictions = trainer.predict(model, dataloaders=val_loader)
+
+        oof_preds_logits = t.cat(predictions)
+        oof_preds_probs = F.softmax(oof_preds_logits, dim=1).numpy()
+        oof_preds_labels_encoded = t.argmax(oof_preds_logits, dim=1).numpy()
+        oof_preds_labels = label_encoder.inverse_transform(oof_preds_labels_encoded)
+
+        fold_df = pd.DataFrame(
+            {
+                "sample_id": val_fold.index.values,
+                "predicted_label": oof_preds_labels,
+                "true_label": val_fold["tumor_type"].values,
+            }
+        )
+
+        class_names = label_encoder.classes_
+        prob_cols = [f"prob_{name}".lower() for name in class_names]
+        prob_df = pd.DataFrame(oof_preds_probs, columns=prob_cols)
+
+        fold_df = pd.concat([fold_df, prob_df], axis=1)
+        all_oof_results.append(fold_df)
+
+    final_df = pd.concat(all_oof_results, ignore_index=True)
+    avg_score = sum(fold_scores) / len(fold_scores)
+
+    return avg_score, final_df

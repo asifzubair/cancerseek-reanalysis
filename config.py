@@ -115,3 +115,8 @@ MUTATION_COL = "mutation_identified_in_plasma"
 LABEL_COL = "tumor_type"
 NONE_TOKEN = "None detected"
 MIN_MUTATION_COUNT = 2
+BEST_PARAMS = {
+    "learning_rate": 0.004627654534332516,
+    "embed_dim": 4,
+    "dropout_prob": 0.2,
+}

@@ -30,7 +30,7 @@ def load_mutation_data():
     df.columns = MUTATION_COL_NAMES
     for col in MUTATION_FEATURES:
         df[col] = pd.to_numeric(df[col], errors="coerce")
-    
+
     df[MUTATION_FEATURES] = df[MUTATION_FEATURES].fillna(0)
 
     return df
@@ -58,7 +58,6 @@ def load_protein_data(
         df[protein_selected] = df[protein_selected].apply(
             lambda col: col.astype(str).str.replace("*", "", regex=False).astype(float)
         )
-    
 
     return df
 
@@ -100,7 +99,7 @@ def fit_and_apply_scaler(train_df, test_df, numerical_cols):
     return train_df_scaled, test_df_scaled, scaler
 
 
-def get_train_test_data(test_size=0.2, random_state=42):
+def get_train_test_data(test_size=0.2, random_state=42, train_only=False):
     """Load, split, and process both protein and mutation data."""
 
     mutation_df = load_mutation_data()
@@ -113,6 +112,9 @@ def get_train_test_data(test_size=0.2, random_state=42):
         how="inner",
     )
     merged_df[NUMERICAL_COLS] = merged_df[NUMERICAL_COLS].fillna(0)
+
+    if train_only:
+        return merged_df, None
 
     patient_labels = merged_df[["sample_id", "tumor_type"]].drop_duplicates()
     train_ids, test_ids = train_test_split(
