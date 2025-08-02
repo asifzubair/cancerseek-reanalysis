@@ -208,3 +208,4 @@ __marimo__/
 data
 .env
 .DS_Store
+playground.ipynb

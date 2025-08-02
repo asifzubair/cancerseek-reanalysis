@@ -1,0 +1,34 @@
+repos:
+
+#isort
+- repo: https://github.com/asottile/seed-isort-config
+  rev: v2.2.0
+  hooks:
+  - id: seed-isort-config
+- repo: https://github.com/pre-commit/mirrors-isort
+  rev: v5.10.1
+  hooks:
+  - id: isort
+
+# black
+- repo: https://github.com/ambv/black
+  rev: 22.6.0
+  hooks:
+    - id: black
+      args: # arguments to configure black
+        - --line-length=88
+        - --include='\.pyi?$'
+
+        # these folders wont be formatted by black
+        - --exclude="""\.git |
+          \.__pycache__|
+          \.hg|
+          \.mypy_cache|
+          \.tox|
+          \.venv|
+          _build|
+          buck-out|
+          build|
+          dist"""
+
+      language_version: python3
