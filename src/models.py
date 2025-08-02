@@ -48,18 +48,17 @@ class CancerPredictor(pl.LightningModule):
         optimizer = tuple.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
         scheduler = t.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
-            mode="min",  # We want to minimize the validation loss
-            factor=0.1,  # Reduce LR by a factor of 10
-            patience=10,  # Epochs with no improvement before reducing LR
+            mode="min",
+            factor=0.1,
+            patience=10,
             verbose=True,
         )
 
-        # Return both in the required dictionary format
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "monitor": "val_loss",  # The metric to monitor
+                "monitor": "val_loss",
             },
         }
 

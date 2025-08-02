@@ -65,7 +65,7 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
 
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor="val_loss",
-        patience=15,  # Number of epochs with no improvement before stopping
+        patience=15,
         verbose=True,
         mode="min",
     )
