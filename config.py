@@ -31,6 +31,12 @@ MUTATION_COL_NAMES = [
     "cancerseek_result",
 ]
 
+MUTATION_FEATURES = [
+    "omega_score",
+    "mutant_allele_frequency",
+    "mutant_fragments_per_ml_plasma",
+]
+
 ## Protein variables
 PROTEIN_COL_NAMES = [
     "patient_id",
@@ -100,18 +106,10 @@ DEVICE = t.device("cuda" if t.cuda.is_available() else "cpu")
 NUMERICAL_COLS = (
     PROTEIN_SELECTED
     + [f"{p}_is_censored" for p in PROTEIN_SELECTED]
-    + [
-        "omega_score",
-        "mutant_allele_frequency",
-        "mutant_fragments_per_ml_plasma",
-    ]
+    + MUTATION_FEATURES
 )
 
-STANDARDIZE_COLS = PROTEIN_SELECTED + [
-    "omega_score",
-    "mutant_allele_frequency",
-    "mutant_fragments_per_ml_plasma",
-]
+STANDARDIZE_COLS = PROTEIN_SELECTED + MUTATION_FEATURES
 
 MUTATION_COL = "mutation_identified_in_plasma"
 LABEL_COL = "tumor_type"

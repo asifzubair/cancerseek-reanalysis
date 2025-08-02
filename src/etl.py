@@ -10,6 +10,7 @@ from config import (
     MIN_MUTATION_COUNT,
     MUTATION_COL,
     MUTATION_COL_NAMES,
+    MUTATION_FEATURES,
     NON_CANCER_STATUS,
     NONE_TOKEN,
     NUMERICAL_COLS,
@@ -27,6 +28,11 @@ def load_mutation_data():
         skipfooter=12,
     )
     df.columns = MUTATION_COL_NAMES
+    for col in MUTATION_FEATURES:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    
+    df[MUTATION_FEATURES] = df[MUTATION_FEATURES].fillna(0)
+
     return df
 
 
@@ -52,6 +58,7 @@ def load_protein_data(
         df[protein_selected] = df[protein_selected].apply(
             lambda col: col.astype(str).str.replace("*", "", regex=False).astype(float)
         )
+    
 
     return df
 
@@ -105,6 +112,7 @@ def get_train_test_data(test_size=0.2, random_state=42):
         on=["sample_id", "tumor_type", "ajcc_stage"],
         how="inner",
     )
+    merged_df[NUMERICAL_COLS] = merged_df[NUMERICAL_COLS].fillna(0)
 
     patient_labels = merged_df[["sample_id", "tumor_type"]].drop_duplicates()
     train_ids, test_ids = train_test_split(

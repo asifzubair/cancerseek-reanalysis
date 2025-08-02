@@ -39,7 +39,7 @@ class CancerDataset(Dataset):
         label = self.df.loc[sample_id]["tumor_type"]
         label = self.label_encoder.transform([label])[0]
 
-        numerical_features = t.tensor(numerical_features.values, dtype=t.float32)
+        numerical_features = t.tensor(numerical_features.astype(float).values, dtype=t.float32)
         mutation_id = t.tensor(mutation_id, dtype=t.long)
         label = t.tensor(label, dtype=t.long)
 
@@ -83,7 +83,7 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
         output_test_result = None
 
     results = {
-        "val_loss": checkpoint_callback.best_model_score.item(),
+        "best_val_loss": checkpoint_callback.best_model_score.item(),
         "val_acc": val_result[0]["val_acc"],
         "test_acc": output_test_result,
     }
