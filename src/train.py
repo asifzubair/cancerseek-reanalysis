@@ -103,12 +103,14 @@ def tune_hyperparameters():
             train_df, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
         ),
         batch_size=32,
+        num_workers = 3,
     )
     val_loader = t.utils.data.DataLoader(
         CancerDataset(
             val_df, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
         ),
         batch_size=32,
+        num_workers = 3,
     )
 
     def objective(trial):
