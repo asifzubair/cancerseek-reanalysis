@@ -97,10 +97,23 @@ PROTEIN_NORMALIZATION_QUANTILE = 0.95
 
 DEVICE = t.device("cuda" if t.cuda.is_available() else "cpu")
 
-NUMERICAL_COLS = PROTEIN_SELECTED + [
-    "omega_score", 
-    "mutant_allele_frequency", 
-    "mutant_fragments_per_ml_plasma",
+NUMERICAL_COLS = (
+    PROTEIN_SELECTED
+    + [f"{p}_is_censored" for p in PROTEIN_SELECTED]
+    + [
+        "omega_score",
+        "mutant_allele_frequency",
+        "mutant_fragments_per_ml_plasma",
     ]
+)
+
+STANDARDIZE_COLS = PROTEIN_SELECTED + [
+    "omega_score",
+    "mutant_allele_frequency",
+    "mutant_fragments_per_ml_plasma",
+]
+
 MUTATION_COL = "mutation_identified_in_plasma"
 LABEL_COL = "tumor_type"
+NONE_TOKEN = "None detected"
+MIN_MUTATION_COUNT = 2

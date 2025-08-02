@@ -1,4 +1,5 @@
 import os
+from collections import Counter
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -6,8 +7,12 @@ from sklearn.preprocessing import StandardScaler
 
 from config import (
     DATA_DIR,
+    MIN_MUTATION_COUNT,
+    MUTATION_COL,
     MUTATION_COL_NAMES,
     NON_CANCER_STATUS,
+    NONE_TOKEN,
+    NUMERICAL_COLS,
     PROTEIN_COL_NAMES,
     PROTEIN_NORMALIZATION_QUANTILE,
     PROTEIN_SELECTED,
@@ -25,7 +30,11 @@ def load_mutation_data():
     return df
 
 
-def load_protein_data(clean=True):
+def load_protein_data(
+    clean=True,
+    protein_cols=PROTEIN_COL_NAMES,
+    protein_selected=PROTEIN_SELECTED,
+):
     """load and optionally clean protein data"""
 
     df = pd.read_excel(
@@ -34,13 +43,15 @@ def load_protein_data(clean=True):
         skiprows=2,
         skipfooter=4,
     )
-    df.columns = PROTEIN_COL_NAMES
+    df.columns = protein_cols
 
     if clean:
-        df[PROTEIN_SELECTED] = df[PROTEIN_SELECTED].apply(
-            lambda col: col.astype(str).str.replace("*", "", regex=False)
+        df[[f"{p}_is_censored" for p in protein_selected]] = df[protein_selected].apply(
+            lambda col: col.astype(str).str.contains(r"\*", na=False).astype(int)
         )
-        df[PROTEIN_SELECTED] = df[PROTEIN_SELECTED].astype(float)
+        df[protein_selected] = df[protein_selected].apply(
+            lambda col: col.astype(str).str.replace("*", "", regex=False).astype(float)
+        )
 
     return df
 
@@ -79,7 +90,7 @@ def fit_and_apply_scaler(train_df, test_df, numerical_cols):
     # ONLY transform the test data
     test_df_scaled[numerical_cols] = scaler.transform(test_df_scaled[numerical_cols])
 
-    return train_df_scaled, test_df_scaled
+    return train_df_scaled, test_df_scaled, scaler
 
 
 def get_train_test_data(test_size=0.2, random_state=42):
@@ -91,7 +102,7 @@ def get_train_test_data(test_size=0.2, random_state=42):
     merged_df = pd.merge(
         mutation_df,
         protein_df,
-        on="sample_id",
+        on=["sample_id", "tumor_type", "ajcc_stage"],
         how="inner",
     )
 
@@ -107,3 +118,41 @@ def get_train_test_data(test_size=0.2, random_state=42):
     test_merged_df = merged_df[merged_df["sample_id"].isin(test_ids)].copy()
 
     return train_merged_df, test_merged_df
+
+
+def preprocess_fold(
+    train_df,
+    val_df,
+    mutation_col=MUTATION_COL,
+    numerical_cols=NUMERICAL_COLS,
+    protein_cols=PROTEIN_SELECTED,
+):
+    """
+    Performs all 'fit' and 'transform' operations for a single CV fold.
+    """
+
+    counts = Counter(train_df[mutation_col])
+    vocab = [
+        mut
+        for mut, count in counts.items()
+        if count >= MIN_MUTATION_COUNT and mut != NONE_TOKEN
+    ]
+    vocab.insert(0, "<UNK>")
+    vocab.insert(0, "<NONE>")
+    mutation_to_idx = {token: i for i, token in enumerate(vocab)}
+
+    fold_thresholds = calculate_thresholds(train_df, protein_cols)
+    train_df = apply_normalization(train_df, fold_thresholds, protein_cols)
+    val_df = apply_normalization(val_df, fold_thresholds, protein_cols)
+
+    train_fold, val_fold, scaler = fit_and_apply_scaler(
+        train_df, val_df, numerical_cols
+    )
+
+    transforms = {
+        "mutation_to_idx": mutation_to_idx,
+        "fold_thresholds": fold_thresholds,
+        "scaler": scaler,
+    }
+
+    return train_fold, val_fold, transforms

@@ -6,7 +6,13 @@ import torch.nn.functional as F
 
 class CancerPredictor(pl.LightningModule):
     def __init__(
-        self, num_mutation_types, *args, learning_rate=1e-3, embed_dim=8, **kwargs
+        self,
+        num_mutation_types,
+        *args,
+        learning_rate=1e-3,
+        embed_dim=8,
+        dropout_prob=0.1,
+        **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.save_hyperparameters()
@@ -19,6 +25,7 @@ class CancerPredictor(pl.LightningModule):
         self.numerical_features = nn.Sequential(
             nn.Linear(in_features=19, out_features=32),
             nn.ReLU(),
+            nn.Dropout(p=self.hparams.dropout_prob),
             nn.Linear(in_features=32, out_features=8),
             nn.ReLU(),
         )
