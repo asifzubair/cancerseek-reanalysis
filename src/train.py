@@ -71,13 +71,9 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
     model = CancerPredictor(**kwargs)
     trainer.fit(model, train_loader, val_loader)
 
-    best_model_path = checkpoint_callback.best_model_path
-    best_model = CancerPredictor.load_from_checkpoint(best_model_path)
-
-    val_result = trainer.validate(best_model, val_loader, verbose=False)
-
+    val_result = trainer.validate(val_loader, ckpt_path="best", verbose=False)
     if test_loader:
-        test_results = trainer.test(best_model, test_loader, verbose=False)
+        test_results = trainer.test(test_loader, ckpt_path="best", verbose=False)
         output_test_result = test_results[0]["test_acc"]
     else:
         output_test_result = None
@@ -88,7 +84,7 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
         "test_acc": output_test_result,
     }
 
-    return best_model, results
+    return checkpoint_callback.best_model_path, results
 
 
 def tune_hyperparameters():
