@@ -26,7 +26,7 @@ class CancerPredictor(pl.LightningModule):
             nn.Linear(in_features=19, out_features=32),
             nn.ReLU(),
             nn.Dropout(p=self.hparams.dropout_prob),
-            nn.Linear(in_features=32, out_features=16),
+            nn.Linear(in_features=32, out_features=8),
             nn.ReLU(),
         )
         self.output_layer = nn.Linear(
