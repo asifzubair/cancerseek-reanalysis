@@ -147,7 +147,7 @@ def tune_hyperparameters():
 def run_cross_validation():
     """run 10 fold cross validation."""
 
-    train_df = get_train_test_data(train_only=True)
+    train_df, _ = get_train_test_data(train_only=True)
     label_encoder = LabelEncoder()
     train_df["tumor_type_encoded"] = label_encoder.fit_transform(train_df["tumor_type"])
 
