@@ -4,11 +4,55 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class Autoencoder(pl.LightningModule):
+    """
+    We'll use autoencoder to project the protein data into a lower dimensional space.
+
+    The model is trained only with Normal data.
+
+    Therefore when cancer data is passed through the AE, we will have larger reconstruction error (?)
+
+    This is the same idea as using VAEs for anomaly detection.
+
+    """
+
+    def __init__(self, in_out_dim, latent_dim=4, learning_rate=1e-3):
+        super().__init__()
+        self.save_hyperparameters()
+        self.encoder = nn.Sequential(
+            nn.Linear(self.hparams.in_out_dim, 16),
+            nn.ReLU(),
+            nn.Linear(16, self.hparams.latent_dim),
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(self.hparams.latent_dim, 16),
+            nn.ReLU(),
+            nn.Linear(16, self.hparams.in_out_dim),
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
+    def training_step(self, batch, batch_idx):
+        x = batch
+        x_hat = self.forward(x)
+        loss = F.mse_loss(x_hat, x)
+        self.log("train_loss", loss)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = t.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        return optimizer
+
+
 class CancerPredictor(pl.LightningModule):
     def __init__(
         self,
         num_mutation_types,
         *args,
+        num_numerical_features=19,
         learning_rate=1e-3,
         embed_dim=8,
         dropout_prob=0.1,
@@ -23,7 +67,7 @@ class CancerPredictor(pl.LightningModule):
             self.hparams.num_mutation_types, self.hparams.embed_dim
         )
         self.numerical_features = nn.Sequential(
-            nn.Linear(in_features=19, out_features=32),
+            nn.Linear(in_features=self.hparams.num_numerical_features, out_features=32),
             nn.ReLU(),
             nn.Dropout(p=self.hparams.dropout_prob),
             nn.Linear(in_features=32, out_features=8),

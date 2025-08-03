@@ -7,10 +7,24 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset
 
-from config import BEST_PARAMS, DEVICE, MUTATION_COL, NUMERICAL_COLS
+from config import BEST_PARAMS, DEVICE, MUTATION_COL, NUMERICAL_COLS, PROTEIN_FEATURES
 from src.etl import get_train_test_data, preprocess_fold
 
-from .models import CancerPredictor
+from .models import Autoencoder, CancerPredictor
+
+
+class AutoencoderDataset(Dataset):
+    def __init__(self, df, protein_features):
+        self.df = df
+        self.protein_features = protein_features
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        features = row[self.protein_features]
+        return t.tensor(features.astype(float).values, dtype=t.float32)
 
 
 class CancerDataset(Dataset):
@@ -48,6 +62,28 @@ class CancerDataset(Dataset):
         label = t.tensor(label, dtype=t.long)
 
         return numerical_features, mutation_id, label
+
+
+def train_ae(healthy_controls_df):
+    """Trains an autoencoder on the healthy controls data."""
+    autoencoder_dataset = AutoencoderDataset(
+        healthy_controls_df, numerical_cols=PROTEIN_FEATURES
+    )
+    autoencoder_loader = t.utils.data.DataLoader(
+        autoencoder_dataset, batch_size=16, shuffle=True, num_workers=2
+    )
+
+    autoencoder = Autoencoder(in_out_dim=len(PROTEIN_FEATURES))
+    ae_trainer = pl.Trainer(
+        accelerator="gpu" if str(DEVICE).startswith("cuda") else "cpu",
+        devices=1,
+        max_epochs=20,
+        enable_progress_bar=False,
+        enable_checkpointing=False,
+    )
+    ae_trainer.fit(autoencoder, autoencoder_loader)
+    autoencoder.eval()
+    return autoencoder
 
 
 def train_model(train_loader, val_loader, test_loader=None, **kwargs):
