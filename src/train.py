@@ -196,7 +196,7 @@ def run_cross_validation():
 
         fold_df = pd.DataFrame(
             {
-                "sample_id": val_fold.index.values,
+                "sample_id": val_fold["sample_id"].values,
                 "predicted_label": oof_preds_labels,
                 "true_label": val_fold["tumor_type"].values,
             }
