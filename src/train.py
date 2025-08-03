@@ -4,10 +4,18 @@ import pytorch_lightning as pl
 import torch as t
 import torch.nn.functional as F
 from sklearn.model_selection import StratifiedKFold
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import Dataset
 
-from config import BEST_PARAMS, DEVICE, MUTATION_COL, NUMERICAL_COLS, PROTEIN_FEATURES
+from config import (
+    BEST_PARAMS,
+    CLASSIFIER_COLS,
+    DEVICE,
+    MUTATION_COL,
+    NON_CANCER_STATUS,
+    NUMERICAL_COLS,
+    PROTEIN_FEATURES,
+)
 from src.etl import get_train_test_data, preprocess_fold
 
 from .models import Autoencoder, CancerPredictor
@@ -67,7 +75,7 @@ class CancerDataset(Dataset):
 def train_ae(healthy_controls_df):
     """Trains an autoencoder on the healthy controls data."""
     autoencoder_dataset = AutoencoderDataset(
-        healthy_controls_df, numerical_cols=PROTEIN_FEATURES
+        healthy_controls_df, protein_features=PROTEIN_FEATURES
     )
     autoencoder_loader = t.utils.data.DataLoader(
         autoencoder_dataset, batch_size=16, shuffle=True, num_workers=2
@@ -142,8 +150,44 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
 def tune_hyperparameters():
     """perform hyperparameter tuning."""
 
-    raw_train_val_df, raw_test_df = get_train_test_data()
-    train_df, val_df, trainsforms = preprocess_fold(raw_train_val_df, raw_test_df)
+    raw_train_df, raw_val_df = get_train_test_data()
+
+    # Fit scaler on healthy controls
+    healthy_controls_df = raw_train_df[
+        raw_train_df.tumor_type == NON_CANCER_STATUS
+    ].copy()
+    protein_scaler = StandardScaler()
+    protein_scaler.fit(healthy_controls_df[PROTEIN_FEATURES])
+
+    # Scale healthy data and train autoencoder
+    healthy_controls_scaled = protein_scaler.transform(
+        healthy_controls_df[PROTEIN_FEATURES]
+    )
+    healthy_controls_scaled_df = pd.DataFrame(
+        healthy_controls_scaled, columns=PROTEIN_FEATURES
+    )
+    autoencoder = train_ae(healthy_controls_scaled_df)
+
+    # Calculate reconstruction error for train and val sets
+    def get_reconstruction_error(df, autoencoder, scaler):
+        protein_data = df[PROTEIN_FEATURES]
+        protein_data_scaled = scaler.transform(protein_data)
+        protein_data_tensor = t.tensor(protein_data_scaled, dtype=t.float32).to(DEVICE)
+        reconstructed = autoencoder(protein_data_tensor)
+        error = t.mean((protein_data_tensor - reconstructed) ** 2, dim=1)
+        return error.cpu().detach().numpy()
+
+    raw_train_df["reconstruction_error"] = get_reconstruction_error(
+        raw_train_df, autoencoder, protein_scaler
+    )
+    raw_val_df["reconstruction_error"] = get_reconstruction_error(
+        raw_val_df, autoencoder, protein_scaler
+    )
+
+    numerical_cols_with_ae = CLASSIFIER_COLS + ["reconstruction_error"]
+    train_df, val_df, trainsforms = preprocess_fold(
+        raw_train_df, raw_val_df, numerical_cols=numerical_cols_with_ae
+    )
     mutation_to_idx = trainsforms["mutation_to_idx"]
     label_encoder = LabelEncoder()
     label_encoder.fit(train_df["tumor_type"])
@@ -154,6 +198,7 @@ def tune_hyperparameters():
         ),
         batch_size=32,
         num_workers=3,
+        shuffle=True,
     )
     val_loader = t.utils.data.DataLoader(
         CancerDataset(
@@ -169,6 +214,7 @@ def tune_hyperparameters():
             "embed_dim": trial.suggest_int("embed_dim", 4, 16, step=4),
             "num_mutation_types": len(mutation_to_idx),
             "dropout_prob": trial.suggest_float("dropout_prob", 0.1, 0.5, step=0.1),
+            "num_numerical_features": len(numerical_cols_with_ae),
         }
         _, results = train_model(train_loader, val_loader, **params)
         return results["best_val_loss"]
