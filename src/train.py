@@ -106,7 +106,6 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
         mode="min",
     )
     learning_rate_callback = pl.callbacks.LearningRateMonitor(logging_interval="epoch")
-
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor="val_loss",
         patience=15,
@@ -148,7 +147,7 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
 
 
 def tune_hyperparameters():
-    """perform hyperparameter tuning."""
+    """perform hyperparameter tuning"""
 
     raw_train_df, raw_val_df = get_train_test_data()
 
@@ -168,8 +167,8 @@ def tune_hyperparameters():
     )
     autoencoder = train_ae(healthy_controls_scaled_df)
 
-    # Calculate reconstruction error for train and val sets
     def get_reconstruction_error(df, autoencoder, scaler):
+        """Calculate reconstruction error for train and val sets"""
         protein_data = df[PROTEIN_FEATURES]
         protein_data_scaled = scaler.transform(protein_data)
         protein_data_tensor = t.tensor(protein_data_scaled, dtype=t.float32).to(DEVICE)
@@ -185,10 +184,10 @@ def tune_hyperparameters():
     )
 
     numerical_cols_with_ae = CLASSIFIER_COLS + ["reconstruction_error"]
-    train_df, val_df, trainsforms = preprocess_fold(
+    train_df, val_df, transforms = preprocess_fold(
         raw_train_df, raw_val_df, numerical_cols=numerical_cols_with_ae
     )
-    mutation_to_idx = trainsforms["mutation_to_idx"]
+    mutation_to_idx = transforms["mutation_to_idx"]
     label_encoder = LabelEncoder()
     label_encoder.fit(train_df["tumor_type"])
 
