@@ -333,11 +333,12 @@ def run_baseline_cross_validation():
     all_oof_results = []
     fold_scores = []
 
-    for _, (train_idx, val_idx) in enumerate(
+    for idx, (train_idx, val_idx) in enumerate(
         StratifiedKFold(n_splits=10, shuffle=True, random_state=42).split(
             train_df["sample_id"], train_df["tumor_type"]
         )
     ):
+        print(f"Fold {idx + 1}/10")
         train_fold = train_df.iloc[train_idx].copy()
         val_fold = train_df.iloc[val_idx].copy()
 
