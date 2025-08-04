@@ -364,6 +364,13 @@ def run_baseline_cross_validation():
             num_classes=len(label_encoder.classes_),
         )
 
+        checkpoint_callback = pl.callbacks.ModelCheckpoint(
+            monitor="val_loss",
+            dirpath="./checkpoints_baseline",
+            filename="best-model-{epoch:02d}-{val_loss:.2f}",
+            save_top_k=1,
+            mode="min",
+        )
         early_stop_callback = pl.callbacks.EarlyStopping(
             monitor="val_loss", patience=10, verbose=False, mode="min"
         )
@@ -371,9 +378,8 @@ def run_baseline_cross_validation():
             accelerator="gpu" if str(DEVICE).startswith("cuda") else "cpu",
             devices=1,
             max_epochs=100,
-            callbacks=[early_stop_callback],
-            enable_progress_bar=False,
-            enable_checkpointing=False,
+            callbacks=[checkpoint_callback, early_stop_callback],
+            enable_progress_bar=True,
         )
         trainer.fit(model, train_loader, val_loader)
 
