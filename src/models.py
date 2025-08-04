@@ -4,6 +4,42 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class LogisticRegressionBaseline(pl.LightningModule):
+    """this is a baseline model directly replicating the paper"""
+
+    def __init__(self, num_features, num_classes, learning_rate=1e-3):
+        super().__init__()
+        self.save_hyperparameters()
+        self.linear = nn.Linear(self.hparams.num_features, self.hparams.num_classes)
+
+    def forward(self, x_numerical):
+        return self.linear(x_numerical)
+
+    def configure_optimizers(self):
+        return t.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+
+    def _calculate_loss(self, batch, mode="train"):
+        x_numerical, y = batch
+        logits = self.forward(x_numerical)
+        loss = F.cross_entropy(logits, y)
+        preds = t.argmax(logits, dim=1)
+        acc = (preds == y).float().mean()
+        self.log(f"{mode}_loss", loss)
+        self.log(f"{mode}_acc", acc, prog_bar=True)
+        return loss
+
+    def training_step(self, batch, batch_idx):
+        return self._calculate_loss(batch, "train")
+
+    def validation_step(self, batch, batch_idx):
+        return self._calculate_loss(batch, "val")
+
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        x_numerical, y = batch
+        logits = self.forward(x_numerical)
+        return t.softmax(logits, dim=1)
+
+
 class Autoencoder(pl.LightningModule):
     """
     We'll use autoencoder to project the protein data into a lower dimensional space.

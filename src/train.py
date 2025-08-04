@@ -15,10 +15,30 @@ from config import (
     NON_CANCER_STATUS,
     NUMERICAL_COLS,
     PROTEIN_FEATURES,
+    PROTEIN_SELECTED,
 )
 from src.etl import get_train_test_data, preprocess_fold
 
-from .models import Autoencoder, CancerPredictor
+from .models import Autoencoder, CancerPredictor, LogisticRegressionBaseline
+
+
+class BaselineDataset(Dataset):
+    def __init__(self, df, numerical_cols, label_encoder):
+        self.df = df
+        self.numerical_cols = numerical_cols
+        self.label_encoder = label_encoder
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        features = row[self.numerical_cols]
+        label = self.label_encoder.transform([row["tumor_type"]])[0]
+        return (
+            t.tensor(features.astype(float).values, dtype=t.float32),
+            t.tensor(label, dtype=t.long),
+        )
 
 
 class AutoencoderDataset(Dataset):
@@ -195,7 +215,11 @@ def tune_hyperparameters():
 
     train_loader = t.utils.data.DataLoader(
         CancerDataset(
-            train_df, mutation_to_idx, numerical_cols_with_ae, MUTATION_COL, label_encoder
+            train_df,
+            mutation_to_idx,
+            numerical_cols_with_ae,
+            MUTATION_COL,
+            label_encoder,
         ),
         batch_size=32,
         num_workers=3,
@@ -275,6 +299,89 @@ def run_cross_validation():
         oof_preds_logits = t.cat(predictions)
         oof_preds_probs = F.softmax(oof_preds_logits, dim=1).numpy()
         oof_preds_labels_encoded = t.argmax(oof_preds_logits, dim=1).numpy()
+        oof_preds_labels = label_encoder.inverse_transform(oof_preds_labels_encoded)
+
+        fold_df = pd.DataFrame(
+            {
+                "sample_id": val_fold["sample_id"].values,
+                "predicted_label": oof_preds_labels,
+                "true_label": val_fold["tumor_type"].values,
+            }
+        )
+
+        class_names = label_encoder.classes_
+        prob_cols = [f"prob_{name}".lower() for name in class_names]
+        prob_df = pd.DataFrame(oof_preds_probs, columns=prob_cols)
+
+        fold_df = pd.concat([fold_df, prob_df], axis=1)
+        all_oof_results.append(fold_df)
+
+    final_df = pd.concat(all_oof_results, ignore_index=True)
+    avg_score = sum(fold_scores) / len(fold_scores)
+
+    return avg_score, final_df
+
+
+def run_baseline_cross_validation():
+    """run 10 fold cross validation for the baseline model"""
+
+    train_df, _ = get_train_test_data(train_only=True)
+    label_encoder = LabelEncoder()
+    train_df["tumor_type_encoded"] = label_encoder.fit_transform(train_df["tumor_type"])
+
+    baseline_features = PROTEIN_SELECTED + ["omega_score"]
+    all_oof_results = []
+    fold_scores = []
+
+    for _, (train_idx, val_idx) in enumerate(
+        StratifiedKFold(n_splits=10, shuffle=True, random_state=42).split(
+            train_df["sample_id"], train_df["tumor_type"]
+        )
+    ):
+        train_fold = train_df.iloc[train_idx].copy()
+        val_fold = train_df.iloc[val_idx].copy()
+
+        # Simplified preprocessing
+        train_fold, val_fold, _ = preprocess_fold(
+            train_fold, val_fold, numerical_cols=baseline_features
+        )
+
+        train_loader = t.utils.data.DataLoader(
+            BaselineDataset(train_fold, baseline_features, label_encoder),
+            batch_size=32,
+            num_workers=3,
+            shuffle=True,
+        )
+        val_loader = t.utils.data.DataLoader(
+            BaselineDataset(val_fold, baseline_features, label_encoder),
+            batch_size=32,
+            num_workers=3,
+        )
+
+        model = LogisticRegressionBaseline(
+            num_features=len(baseline_features),
+            num_classes=len(label_encoder.classes_),
+        )
+
+        early_stop_callback = pl.callbacks.EarlyStopping(
+            monitor="val_loss", patience=10, verbose=False, mode="min"
+        )
+        trainer = pl.Trainer(
+            accelerator="gpu" if str(DEVICE).startswith("cuda") else "cpu",
+            devices=1,
+            max_epochs=100,
+            callbacks=[early_stop_callback],
+            enable_progress_bar=False,
+            enable_checkpointing=False,
+        )
+        trainer.fit(model, train_loader, val_loader)
+
+        val_result = trainer.validate(dataloaders=val_loader, verbose=False)
+        fold_scores.append(val_result[0]["val_loss"])
+
+        predictions = trainer.predict(model, dataloaders=val_loader)
+        oof_preds_probs = t.cat(predictions).numpy()
+        oof_preds_labels_encoded = oof_preds_probs.argmax(axis=1)
         oof_preds_labels = label_encoder.inverse_transform(oof_preds_labels_encoded)
 
         fold_df = pd.DataFrame(
