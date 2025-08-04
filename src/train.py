@@ -166,6 +166,7 @@ def tune_hyperparameters():
         healthy_controls_scaled, columns=PROTEIN_FEATURES
     )
     autoencoder = train_ae(healthy_controls_scaled_df)
+    autoencoder.to(DEVICE)
 
     def get_reconstruction_error(df, autoencoder, scaler):
         """Calculate reconstruction error for train and val sets"""
