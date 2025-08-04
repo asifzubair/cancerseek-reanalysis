@@ -5,6 +5,14 @@ import seaborn as sns
 from sklearn.metrics import auc, confusion_matrix, roc_curve
 
 
+def make_class_names(df):
+    prob_cols = [col for col in df.columns if col.startswith("prob_")]
+    class_names = sorted(
+        [col.replace("prob_", "").replace("_", " ").title() for col in prob_cols]
+    )
+    return class_names
+
+
 def calculate_sens_spec(y_true, y_pred, class_names):
     """calculate sensitivity and specificity for each class."""
     cm = confusion_matrix(y_true, y_pred, labels=class_names)
@@ -24,8 +32,8 @@ def calculate_sens_spec(y_true, y_pred, class_names):
     return pd.DataFrame.from_dict(results, orient="index")
 
 
-def plot_roc_curve(y_true, y_pred_probs, file_path, positive_label="cancer"):
-    """plot the ROC curve and saves it to a file."""
+def plot_roc_curve(y_true, y_pred_probs):
+    """plot the ROC curve and saves it to a file"""
     with sns.axes_style("whitegrid"):
         y_true_binary = (y_true != "Normal").astype(int)
 
@@ -47,11 +55,10 @@ def plot_roc_curve(y_true, y_pred_probs, file_path, positive_label="cancer"):
         plt.ylabel("True Positive Rate")
         plt.title("Receiver Operating Characteristic")
         plt.legend(loc="lower right")
-        plt.savefig(file_path)
-        plt.close()
+        plt.show()
 
 
-def plot_confusion_matrix(y_true, y_pred, class_names, file_path):
+def plot_confusion_matrix(y_true, y_pred, class_names):
     """plot a confusion matrix using seaborn and saves it."""
     cm = confusion_matrix(y_true, y_pred, labels=class_names)
     cm_normalized = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
@@ -69,5 +76,4 @@ def plot_confusion_matrix(y_true, y_pred, class_names, file_path):
         plt.title("Normalized Confusion Matrix")
         plt.ylabel("True Label")
         plt.xlabel("Predicted Label")
-        plt.savefig(file_path)
-        plt.close()
+        plt.show()

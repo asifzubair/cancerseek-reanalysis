@@ -383,10 +383,12 @@ def run_baseline_cross_validation():
         )
         trainer.fit(model, train_loader, val_loader)
 
-        val_result = trainer.validate(dataloaders=val_loader, verbose=False)
+        val_result = trainer.validate(
+            dataloaders=val_loader, ckpt_path="best", verbose=False
+        )
         fold_scores.append(val_result[0]["val_loss"])
 
-        predictions = trainer.predict(model, dataloaders=val_loader)
+        predictions = trainer.predict(model, dataloaders=val_loader, ckpt_path="best")
         oof_preds_probs = t.cat(predictions).numpy()
         oof_preds_labels_encoded = oof_preds_probs.argmax(axis=1)
         oof_preds_labels = label_encoder.inverse_transform(oof_preds_labels_encoded)
