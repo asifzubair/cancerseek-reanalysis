@@ -88,7 +88,7 @@ def train_ae(healthy_controls_df):
         accelerator="gpu" if str(DEVICE).startswith("cuda") else "cpu",
         devices=1,
         max_epochs=20,
-        enable_progress_bar=False,
+        enable_progress_bar=True,
         enable_checkpointing=False,
     )
     ae_trainer.fit(autoencoder, autoencoder_loader)
