@@ -167,6 +167,16 @@ def train_model(train_loader, val_loader, test_loader=None, **kwargs):
     return trainer, results
 
 
+def get_reconstruction_error(df, autoencoder, scaler):
+    """Calculate reconstruction error for train and val sets"""
+    protein_data = df[PROTEIN_FEATURES]
+    protein_data_scaled = scaler.transform(protein_data)
+    protein_data_tensor = t.tensor(protein_data_scaled, dtype=t.float32).to(DEVICE)
+    reconstructed = autoencoder(protein_data_tensor)
+    error = t.mean((protein_data_tensor - reconstructed) ** 2, dim=1)
+    return error.cpu().detach().numpy()
+
+
 def tune_hyperparameters():
     """perform hyperparameter tuning"""
 
@@ -188,15 +198,6 @@ def tune_hyperparameters():
     )
     autoencoder = train_ae(healthy_controls_scaled_df)
     autoencoder.to(DEVICE)
-
-    def get_reconstruction_error(df, autoencoder, scaler):
-        """Calculate reconstruction error for train and val sets"""
-        protein_data = df[PROTEIN_FEATURES]
-        protein_data_scaled = scaler.transform(protein_data)
-        protein_data_tensor = t.tensor(protein_data_scaled, dtype=t.float32).to(DEVICE)
-        reconstructed = autoencoder(protein_data_tensor)
-        error = t.mean((protein_data_tensor - reconstructed) ** 2, dim=1)
-        return error.cpu().detach().numpy()
 
     raw_train_df["reconstruction_error"] = get_reconstruction_error(
         raw_train_df, autoencoder, protein_scaler
@@ -256,33 +257,65 @@ def run_cross_validation():
 
     train_df, _ = get_train_test_data(train_only=True)
     label_encoder = LabelEncoder()
-    train_df["tumor_type_encoded"] = label_encoder.fit_transform(train_df["tumor_type"])
+    label_encoder.fit(train_df["tumor_type"])
 
     fold_scores = []
     all_oof_results = []
 
-    for _, (train_idx, val_idx) in enumerate(
+    for idx, (train_idx, val_idx) in enumerate(
         StratifiedKFold(n_splits=10, shuffle=True, random_state=42).split(
             train_df["sample_id"], train_df["tumor_type"]
         )
     ):
+        print(f"Fold {idx + 1}/10")
         train_fold = train_df.iloc[train_idx].copy()
         val_fold = train_df.iloc[val_idx].copy()
 
-        train_fold, val_fold, transforms = preprocess_fold(train_fold, val_fold)
+        healthy_controls_df = train_fold[
+            train_fold.tumor_type == NON_CANCER_STATUS
+        ].copy()
+        ae_scaler = StandardScaler()
+        ae_scaler.fit(healthy_controls_df[PROTEIN_FEATURES])
+
+        healthy_controls_scaled = ae_scaler.transform(
+            healthy_controls_df[PROTEIN_FEATURES]
+        )
+        healthy_controls_scaled_df = pd.DataFrame(
+            healthy_controls_scaled, columns=PROTEIN_FEATURES
+        )
+        autoencoder = train_ae(healthy_controls_scaled_df)
+
+        train_fold["reconstruction_error"] = get_reconstruction_error(
+            train_fold, autoencoder, ae_scaler
+        )
+        val_fold["reconstruction_error"] = get_reconstruction_error(
+            val_fold, autoencoder, ae_scaler
+        )
+
+        numerical_cols_with_ae = CLASSIFIER_COLS + ["reconstruction_error"]
+        train_fold, val_fold, transforms = preprocess_fold(
+            train_fold, val_fold, numerical_cols=numerical_cols_with_ae
+        )
         mutation_to_idx = transforms["mutation_to_idx"]
 
         train_loader = t.utils.data.DataLoader(
             CancerDataset(
-                train_fold, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
+                train_fold,
+                mutation_to_idx,
+                numerical_cols_with_ae,
+                MUTATION_COL,
+                label_encoder,
             ),
             batch_size=32,
             num_workers=3,
         )
-
         val_loader = t.utils.data.DataLoader(
             CancerDataset(
-                val_fold, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
+                val_fold,
+                mutation_to_idx,
+                numerical_cols_with_ae,
+                MUTATION_COL,
+                label_encoder,
             ),
             batch_size=32,
             num_workers=3,

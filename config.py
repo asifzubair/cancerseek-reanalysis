@@ -30,7 +30,6 @@ MUTATION_COL_NAMES = [
     "cancerseek_score",
     "cancerseek_result",
 ]
-
 MUTATION_FEATURES = [
     "omega_score",
     "mutant_allele_frequency",
@@ -85,9 +84,7 @@ PROTEIN_COL_NAMES = [
     "cancerseek_score",
     "cancerseek_result",
 ]
-
 PROTEIN_FEATURES = PROTEIN_COL_NAMES[4:-2]
-
 PROTEIN_SELECTED = [
     "ca_125",
     "cea",
@@ -98,26 +95,21 @@ PROTEIN_SELECTED = [
     "myeloperoxidase",
     "timp_1",
 ]
-
 PROTEIN_NORMALIZATION_QUANTILE = 0.95
 
 ## Model & Trainer parameters
-
 DEVICE = t.device("cuda" if t.cuda.is_available() else "cpu")
-
 NUMERICAL_COLS = (
     PROTEIN_FEATURES
     + [f"{p}_is_censored" for p in PROTEIN_SELECTED]
     + MUTATION_FEATURES
 )
-
 CLASSIFIER_COLS = (
     PROTEIN_SELECTED
     + [f"{p}_is_censored" for p in PROTEIN_SELECTED]
     + MUTATION_FEATURES
 )
 STANDARDIZE_COLS = PROTEIN_SELECTED + MUTATION_FEATURES
-
 MUTATION_COL = "mutation_identified_in_plasma"
 LABEL_COL = "tumor_type"
 NONE_TOKEN = "None detected"
