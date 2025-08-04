@@ -74,6 +74,8 @@ class CancerDataset(Dataset):
 
 def train_ae(healthy_controls_df):
     """Trains an autoencoder on the healthy controls data."""
+
+    print("starting training of the AE ... ")
     autoencoder_dataset = AutoencoderDataset(
         healthy_controls_df, protein_features=PROTEIN_FEATURES
     )
