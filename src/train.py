@@ -13,7 +13,6 @@ from config import (
     DEVICE,
     MUTATION_COL,
     NON_CANCER_STATUS,
-    NUMERICAL_COLS,
     PROTEIN_FEATURES,
     PROTEIN_SELECTED,
 )
