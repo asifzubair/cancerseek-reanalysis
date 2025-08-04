@@ -194,7 +194,7 @@ def tune_hyperparameters():
 
     train_loader = t.utils.data.DataLoader(
         CancerDataset(
-            train_df, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
+            train_df, mutation_to_idx, numerical_cols_with_ae, MUTATION_COL, label_encoder
         ),
         batch_size=32,
         num_workers=3,
@@ -202,7 +202,7 @@ def tune_hyperparameters():
     )
     val_loader = t.utils.data.DataLoader(
         CancerDataset(
-            val_df, mutation_to_idx, NUMERICAL_COLS, MUTATION_COL, label_encoder
+            val_df, mutation_to_idx, numerical_cols_with_ae, MUTATION_COL, label_encoder
         ),
         batch_size=32,
         num_workers=3,
@@ -236,7 +236,7 @@ def run_cross_validation():
     fold_scores = []
     all_oof_results = []
 
-    for idx, (train_idx, val_idx) in enumerate(
+    for _, (train_idx, val_idx) in enumerate(
         StratifiedKFold(n_splits=10, shuffle=True, random_state=42).split(
             train_df["sample_id"], train_df["tumor_type"]
         )
