@@ -4,6 +4,8 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import auc, confusion_matrix, roc_curve
 
+from config import NON_CANCER_STATUS
+
 
 def make_class_names(df):
     prob_cols = [col for col in df.columns if col.startswith("prob_")]
@@ -32,30 +34,41 @@ def calculate_sens_spec(y_true, y_pred, class_names):
     return pd.DataFrame.from_dict(results, orient="index")
 
 
-def plot_roc_curve(y_true, y_pred_probs):
-    """plot the ROC curve and saves it to a file"""
-    with sns.axes_style("whitegrid"):
-        y_true_binary = (y_true != "Normal").astype(int)
+def add_roc_curve_to_ax(y_true, y_pred_probs, label, ax=None):
+    """
+    calculate and plot a single ROC curve on a given matplotlib axes object.
+    if no axes is provided, it creates a new figure and axes.
 
-        fpr, tpr, _ = roc_curve(y_true_binary, y_pred_probs)
-        roc_auc = auc(fpr, tpr)
+    Assume we have the results from two models:
+    model1_probs = 1 - df1["prob_normal"]]
+    model2_probs = 1 - df2["prob_normal"]
+    y_true = df1["true_label"]
 
-        plt.figure()
-        plt.plot(
-            fpr,
-            tpr,
-            color="darkorange",
-            lw=2,
-            label="ROC curve (area = %0.2f)" % roc_auc,
-        )
-        plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.title("Receiver Operating Characteristic")
-        plt.legend(loc="lower right")
-        plt.show()
+    fig, ax = add_roc_curve_to_ax(y_true, model1_probs, label="Model1")
+    add_roc_curve_to_ax(y_true, model2_probs, label="Model2", ax=ax)
+    plt.show()
+
+    """
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+    else:
+        fig = ax.get_figure()
+
+    y_true_binary = (y_true != NON_CANCER_STATUS).astype(int)
+    fpr, tpr, _ = roc_curve(y_true_binary, y_pred_probs)
+    roc_auc = auc(fpr, tpr)
+    ax.plot(fpr, tpr, lw=2, label=f"{label} (AUC = {roc_auc:.2f})")
+
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title("ROC Curve")
+    ax.legend(loc="lower right")
+
+    return fig, ax
 
 
 def plot_confusion_matrix(y_true, y_pred, class_names):
