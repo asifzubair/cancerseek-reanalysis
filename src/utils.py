@@ -7,31 +7,17 @@ from sklearn.metrics import auc, confusion_matrix, roc_curve
 from config import NON_CANCER_STATUS
 
 
-def make_class_names(df):
-    prob_cols = [col for col in df.columns if col.startswith("prob_")]
-    class_names = sorted(
-        [col.replace("prob_", "").replace("_", " ").title() for col in prob_cols]
-    )
-    return class_names
+def compute_sens_spec(df):
+    """compute overall sens and spec from the confusion matrix"""
+    y_true_binary = (df["true_label"] != "Normal").astype(int)
+    y_pred_binary = (df["predicted_label"] != "Normal").astype(int)
 
+    tn, fp, fn, tp = confusion_matrix(y_true_binary, y_pred_binary).ravel()
 
-def calculate_sens_spec(y_true, y_pred, class_names):
-    """calculate sensitivity and specificity for each class."""
-    cm = confusion_matrix(y_true, y_pred, labels=class_names)
-    results = {}
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
 
-    for i, class_name in enumerate(class_names):
-        tp = cm[i, i]
-        fn = sum(cm[i, :]) - tp
-        fp = sum(cm[:, i]) - tp
-        tn = cm.sum() - (tp + fn + fp)
-
-        sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
-        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
-
-        results[class_name] = {"sensitivity": sensitivity, "specificity": specificity}
-
-    return pd.DataFrame.from_dict(results, orient="index")
+    return sensitivity, specificity
 
 
 def add_roc_curve_to_ax(y_true, y_pred_probs, label, ax=None):
@@ -69,6 +55,33 @@ def add_roc_curve_to_ax(y_true, y_pred_probs, label, ax=None):
     ax.legend(loc="lower right")
 
     return fig, ax
+
+
+def make_class_names(df):
+    prob_cols = [col for col in df.columns if col.startswith("prob_")]
+    class_names = sorted(
+        [col.replace("prob_", "").replace("_", " ").title() for col in prob_cols]
+    )
+    return class_names
+
+
+def calculate_sens_spec(y_true, y_pred, class_names):
+    """calculate sensitivity and specificity for each class."""
+    cm = confusion_matrix(y_true, y_pred, labels=class_names)
+    results = {}
+
+    for i, class_name in enumerate(class_names):
+        tp = cm[i, i]
+        fn = sum(cm[i, :]) - tp
+        fp = sum(cm[:, i]) - tp
+        tn = cm.sum() - (tp + fn + fp)
+
+        sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+
+        results[class_name] = {"sensitivity": sensitivity, "specificity": specificity}
+
+    return pd.DataFrame.from_dict(results, orient="index")
 
 
 def plot_confusion_matrix(y_true, y_pred, class_names):
