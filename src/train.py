@@ -75,7 +75,6 @@ class CancerDataset(Dataset):
 def train_ae(healthy_controls_df):
     """Trains an autoencoder on the healthy controls data."""
 
-    print("starting training of the AE ... ")
     autoencoder_dataset = AutoencoderDataset(
         healthy_controls_df, protein_features=PROTEIN_FEATURES
     )
@@ -88,7 +87,7 @@ def train_ae(healthy_controls_df):
         accelerator="gpu" if str(DEVICE).startswith("cuda") else "cpu",
         devices=1,
         max_epochs=20,
-        enable_progress_bar=True,
+        enable_progress_bar=False,
         enable_checkpointing=False,
     )
     ae_trainer.fit(autoencoder, autoencoder_loader)
