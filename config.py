@@ -101,12 +101,12 @@ PROTEIN_NORMALIZATION_QUANTILE = 0.95
 DEVICE = t.device("cuda" if t.cuda.is_available() else "cpu")
 NUMERICAL_COLS = (
     PROTEIN_FEATURES
-    + [f"{p}_is_censored" for p in PROTEIN_SELECTED]
+    #    + [f"{p}_is_censored" for p in PROTEIN_SELECTED]
     + MUTATION_FEATURES
 )
 CLASSIFIER_COLS = (
     PROTEIN_SELECTED
-    + [f"{p}_is_censored" for p in PROTEIN_SELECTED]
+    #    + [f"{p}_is_censored" for p in PROTEIN_SELECTED]
     + MUTATION_FEATURES
 )
 STANDARDIZE_COLS = PROTEIN_SELECTED + MUTATION_FEATURES

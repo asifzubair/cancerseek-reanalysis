@@ -78,9 +78,11 @@ def apply_normalization(df, thresholds, protein_cols):
 
 
 def fit_and_apply_scaler(train_df, test_df, numerical_cols):
-    """fit a `StandardScaler` on the training data and apply it to both train and test data.
+    """
 
-    we are being non-rigourous about `test` here .. could be val too
+    fit a `StandardScaler` on the training data and apply it to both train and test data.
+
+    we are being non-rigourous about `test` here ... could be val too
 
     """
     scaler = StandardScaler()

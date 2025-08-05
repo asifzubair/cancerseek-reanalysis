@@ -5,7 +5,7 @@ import torch as t
 import torch.nn.functional as F
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Dataset
 
 from config import (
     BEST_PARAMS,
@@ -13,6 +13,7 @@ from config import (
     DEVICE,
     MUTATION_COL,
     NON_CANCER_STATUS,
+    NONE_TOKEN,
     PROTEIN_FEATURES,
     PROTEIN_SELECTED,
 )
@@ -75,9 +76,12 @@ class CancerDataset(Dataset):
 
         numerical_features = self.df.loc[sample_id][self.numerical_cols]
         mutation_string = self.df.loc[sample_id][self.mutation_col]
-        mutation_id = self.mutation_to_idx.get(
-            mutation_string, self.mutation_to_idx["<UNK>"]
-        )
+        if mutation_string == NONE_TOKEN:
+            mutation_id = self.mutation_to_idx["<NONE>"]
+        else:
+            mutation_id = self.mutation_to_idx.get(
+                mutation_string, self.mutation_to_idx["<UNK>"]
+            )
 
         label = self.df.loc[sample_id]["tumor_type"]
         label = self.label_encoder.transform([label])[0]
@@ -97,7 +101,7 @@ def train_ae(healthy_controls_df):
     autoencoder_dataset = AutoencoderDataset(
         healthy_controls_df, protein_features=PROTEIN_FEATURES
     )
-    autoencoder_loader = t.utils.data.DataLoader(
+    autoencoder_loader = DataLoader(
         autoencoder_dataset, batch_size=16, shuffle=True, num_workers=2
     )
 
@@ -115,9 +119,7 @@ def train_ae(healthy_controls_df):
 
 
 def train_model(train_loader, val_loader, test_loader=None, **kwargs):
-    """
-    Trains a model and tests it on the test set.
-    """
+    """Trains a model and tests it on the test set"""
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         monitor="val_loss",
         dirpath="./checkpoints",
@@ -213,7 +215,7 @@ def tune_hyperparameters():
     label_encoder = LabelEncoder()
     label_encoder.fit(train_df["tumor_type"])
 
-    train_loader = t.utils.data.DataLoader(
+    train_loader = DataLoader(
         CancerDataset(
             train_df,
             mutation_to_idx,
@@ -225,7 +227,7 @@ def tune_hyperparameters():
         num_workers=3,
         shuffle=True,
     )
-    val_loader = t.utils.data.DataLoader(
+    val_loader = DataLoader(
         CancerDataset(
             val_df, mutation_to_idx, numerical_cols_with_ae, MUTATION_COL, label_encoder
         ),
@@ -297,7 +299,7 @@ def run_cross_validation():
         )
         mutation_to_idx = transforms["mutation_to_idx"]
 
-        train_loader = t.utils.data.DataLoader(
+        train_loader = DataLoader(
             CancerDataset(
                 train_fold,
                 mutation_to_idx,
@@ -308,7 +310,7 @@ def run_cross_validation():
             batch_size=32,
             num_workers=3,
         )
-        val_loader = t.utils.data.DataLoader(
+        val_loader = DataLoader(
             CancerDataset(
                 val_fold,
                 mutation_to_idx,
@@ -379,13 +381,13 @@ def run_baseline_cross_validation():
             train_fold, val_fold, numerical_cols=baseline_features
         )
 
-        train_loader = t.utils.data.DataLoader(
+        train_loader = DataLoader(
             BaselineDataset(train_fold, baseline_features, label_encoder),
             batch_size=32,
             num_workers=3,
             shuffle=True,
         )
-        val_loader = t.utils.data.DataLoader(
+        val_loader = DataLoader(
             BaselineDataset(val_fold, baseline_features, label_encoder),
             batch_size=32,
             num_workers=3,
