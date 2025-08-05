@@ -379,7 +379,6 @@ def run_baseline_cross_validation():
         train_fold = train_df.iloc[train_idx].copy()
         val_fold = train_df.iloc[val_idx].copy()
 
-        # Simplified preprocessing
         train_fold, val_fold, _ = preprocess_fold(
             train_fold, val_fold, numerical_cols=baseline_features
         )

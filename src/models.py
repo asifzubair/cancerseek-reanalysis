@@ -103,10 +103,10 @@ class CancerPredictor(pl.LightningModule):
             self.hparams.num_mutation_types, self.hparams.embed_dim
         )
         self.numerical_features = nn.Sequential(
-            nn.Linear(in_features=self.hparams.num_numerical_features, out_features=32),
+            nn.Linear(in_features=self.hparams.num_numerical_features, out_features=16),
             nn.ReLU(),
             nn.Dropout(p=self.hparams.dropout_prob),
-            nn.Linear(in_features=32, out_features=8),
+            nn.Linear(in_features=16, out_features=8),
             nn.ReLU(),
         )
         self.output_layer = nn.Linear(
