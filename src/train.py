@@ -285,6 +285,7 @@ def run_cross_validation():
             healthy_controls_scaled, columns=PROTEIN_FEATURES
         )
         autoencoder = train_ae(healthy_controls_scaled_df)
+        autoencoder.to(DEVICE)
 
         train_fold["reconstruction_error"] = get_reconstruction_error(
             train_fold, autoencoder, ae_scaler
