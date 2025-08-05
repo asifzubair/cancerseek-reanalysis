@@ -87,8 +87,8 @@ class CancerPredictor(pl.LightningModule):
     def __init__(
         self,
         num_mutation_types,
+        num_numerical_features,
         *args,
-        num_numerical_features=19,
         learning_rate=1e-3,
         embed_dim=8,
         dropout_prob=0.1,

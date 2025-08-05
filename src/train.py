@@ -322,7 +322,10 @@ def run_cross_validation():
             num_workers=3,
         )
 
-        trainer, results = train_model(train_loader, val_loader, **BEST_PARAMS)
+        params = BEST_PARAMS.copy()
+        params["num_numerical_features"] = len(numerical_cols_with_ae)
+        params["num_mutation_types"] = len(mutation_to_idx)
+        trainer, results = train_model(train_loader, val_loader, **params)
         fold_scores.append(results["best_val_loss"])
 
         model = CancerPredictor.load_from_checkpoint(
