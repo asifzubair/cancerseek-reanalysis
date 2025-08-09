@@ -7,19 +7,6 @@ from sklearn.metrics import auc, confusion_matrix, roc_curve
 from config import NON_CANCER_STATUS
 
 
-def compute_sens_spec(df):
-    """compute overall sens and spec from the confusion matrix"""
-    y_true_binary = (df["true_label"] != "Normal").astype(int)
-    y_pred_binary = (df["predicted_label"] != "Normal").astype(int)
-
-    tn, fp, fn, tp = confusion_matrix(y_true_binary, y_pred_binary).ravel()
-
-    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
-    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
-
-    return sensitivity, specificity
-
-
 def add_roc_curve_to_ax(y_true, y_pred_probs, label, ax=None):
     """
     calculate and plot a single ROC curve on a given matplotlib axes object.
@@ -57,6 +44,19 @@ def add_roc_curve_to_ax(y_true, y_pred_probs, label, ax=None):
     return fig, ax
 
 
+def calculate_sens_spec(df):
+    """compute overall sens and spec from the confusion matrix"""
+    y_true_binary = (df["true_label"] != "Normal").astype(int)
+    y_pred_binary = (df["predicted_label"] != "Normal").astype(int)
+
+    tn, fp, fn, tp = confusion_matrix(y_true_binary, y_pred_binary).ravel()
+
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+
+    return sensitivity, specificity
+
+
 def make_class_names(df):
     prob_cols = [col for col in df.columns if col.startswith("prob_")]
     class_names = sorted(
@@ -65,7 +65,7 @@ def make_class_names(df):
     return class_names
 
 
-def calculate_sens_spec(y_true, y_pred, class_names):
+def calculate_sens_spec_per_class(y_true, y_pred, class_names):
     """calculate sensitivity and specificity for each class."""
     cm = confusion_matrix(y_true, y_pred, labels=class_names)
     results = {}
@@ -84,7 +84,7 @@ def calculate_sens_spec(y_true, y_pred, class_names):
     return pd.DataFrame.from_dict(results, orient="index")
 
 
-def plot_confusion_matrix(y_true, y_pred, class_names):
+def plot_confusion_matrix(y_true, y_pred, class_names, label = "Model"):
     """plot a confusion matrix using seaborn and saves it."""
     cm = confusion_matrix(y_true, y_pred, labels=class_names)
     cm_normalized = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
@@ -99,7 +99,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names):
             xticklabels=class_names,
             yticklabels=class_names,
         )
-        plt.title("Normalized Confusion Matrix")
+        plt.title(f"Normalized Confusion Matrix - {label}")
         plt.ylabel("True Label")
         plt.xlabel("Predicted Label")
         plt.show()
