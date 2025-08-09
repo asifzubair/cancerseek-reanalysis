@@ -1,6 +1,6 @@
-# CancerSeek-reanalysis
+# Cancer(Re-)SEEK(-ing)
 
-This project is a extension of the machine learning modelling from the paper "Detection and localization of surgically resectable cancers with a multi-analyte blood test" by Cohen et al. (2018). The goal is to predict cancer based on proteomic and genetic (mutation) data from patient blood samples.
+This project is an extension of the machine learning modelling from the paper "Detection and localization of surgically resectable cancers with a multi-analyte blood test" by Cohen et al. (2018). The goal is to predict cancer based on proteomic and genetic (mutation) data from patient blood samples.
 
 ## Project Overview
 
