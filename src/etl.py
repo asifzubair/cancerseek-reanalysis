@@ -15,6 +15,7 @@ from config import (
     NONE_TOKEN,
     NUMERICAL_COLS,
     PROTEIN_COL_NAMES,
+    PROTEIN_FEATURES,
     PROTEIN_NORMALIZATION_QUANTILE,
     PROTEIN_SELECTED,
 )
@@ -25,7 +26,7 @@ def load_mutation_data():
         os.path.join(DATA_DIR, "NIHMS982921-supplement-Tables_S1_to_S11.xlsx"),
         sheet_name="Table S5",
         skiprows=2,
-        skipfooter=12,
+        skipfooter=2,
     )
     df.columns = MUTATION_COL_NAMES
     for col in MUTATION_FEATURES:
@@ -37,8 +38,8 @@ def load_mutation_data():
 
 
 def load_protein_data(
-    clean=True,
     protein_cols=PROTEIN_COL_NAMES,
+    protein_features=PROTEIN_FEATURES,
     protein_selected=PROTEIN_SELECTED,
 ):
     """load and optionally clean protein data"""
@@ -51,13 +52,12 @@ def load_protein_data(
     )
     df.columns = protein_cols
 
-    if clean:
-        df[[f"{p}_is_censored" for p in protein_selected]] = df[protein_selected].apply(
-            lambda col: col.astype(str).str.contains(r"\*", na=False).astype(int)
-        )
-        df[protein_selected] = df[protein_selected].apply(
-            lambda col: col.astype(str).str.replace("*", "", regex=False).astype(float)
-        )
+    df[[f"{p}_is_censored" for p in protein_selected]] = df[protein_selected].apply(
+        lambda col: col.astype(str).str.contains(r"\*", na=False).astype(int)
+    )
+    df[protein_features] = df[protein_features].apply(
+        lambda col: col.astype(str).str.replace("*", "", regex=False).astype(float)
+    )
 
     return df
 
@@ -78,9 +78,11 @@ def apply_normalization(df, thresholds, protein_cols):
 
 
 def fit_and_apply_scaler(train_df, test_df, numerical_cols):
-    """fit a `StandardScaler` on the training data and apply it to both train and test data.
+    """
 
-    we are being non-rigourous about `test` here .. could be val too
+    fit a `StandardScaler` on the training data and apply it to both train and test data.
+
+    we are being non-rigourous about `test` here ... could be val too
 
     """
     scaler = StandardScaler()
@@ -103,7 +105,7 @@ def get_train_test_data(test_size=0.2, random_state=42, train_only=False):
     """Load, split, and process both protein and mutation data."""
 
     mutation_df = load_mutation_data()
-    protein_df = load_protein_data(clean=True)
+    protein_df = load_protein_data()
 
     merged_df = pd.merge(
         mutation_df,
