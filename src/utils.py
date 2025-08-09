@@ -84,7 +84,7 @@ def calculate_sens_spec_per_class(y_true, y_pred, class_names):
     return pd.DataFrame.from_dict(results, orient="index")
 
 
-def plot_confusion_matrix(y_true, y_pred, class_names, label = "Model"):
+def plot_confusion_matrix(y_true, y_pred, class_names, label="Model"):
     """plot a confusion matrix using seaborn and saves it."""
     cm = confusion_matrix(y_true, y_pred, labels=class_names)
     cm_normalized = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
